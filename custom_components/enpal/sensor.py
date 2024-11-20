@@ -48,6 +48,13 @@ FIELD_MAP: dict[str, EnpalSensorConfig] = {
     "Current.Phase.C": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Ampere Phase C', 'current', 'A'),
     "Power.AC.Phase.C": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Power Phase C', 'power', 'W'),
     
+    "Current.String.1": EnpalSensorConfig("mdi:sun-angle", "Enpal Current String 1", "current", "A"),
+    "Voltage.String.1": EnpalSensorConfig("mdi:sun-angle", "Enpal Voltage String 1", "current", "A"),
+    "Power.DC.String.1": EnpalSensorConfig("mdi:sun-angle", "Enpal Power String 1", "current", "A"),
+    "Current.String.1": EnpalSensorConfig("mdi:sun-angle", "Enpal Current String 2", "current", "A"),
+    "Voltage.String.1": EnpalSensorConfig("mdi:sun-angle", "Enpal Voltage String 2", "current", "A"),
+    "Power.DC.String.1": EnpalSensorConfig("mdi:sun-angle", "Enpal Power String 2", "current", "A"),
+    
     "Power.Battery.Charge.Discharge": EnpalSensorConfig('mdi:battery-charging', 'Enpal Battery Power', 'power', 'W'),
     "Energy.Battery.Charge.Level": EnpalSensorConfig('mdi:battery', 'Enpal Battery Percent', 'battery', '%'),
     "Energy.Battery.Charge.Day": EnpalSensorConfig('mdi:battery-arrow-up', 'Enpal Battery Charge Day', 'energy', 'kWh'),
