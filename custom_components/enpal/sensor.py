@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import timedelta, datetime
+from typing import NamedTuple
 from homeassistant.components.sensor import (SensorEntity)
 from homeassistant.core import HomeAssistant
 from homeassistant import config_entries
@@ -20,6 +21,45 @@ SCAN_INTERVAL = timedelta(seconds=20)
 
 VERSION= '0.1.0'
 
+class EnpalSensorConfig(NamedTuple):
+    icon: str
+    name: str
+    device_class: str
+    unit: str
+
+FIELD_MAP: dict[str, EnpalSensorConfig] = {
+    "Power.DC.Total": EnpalSensorConfig('mdi:solar-power', 'Enpal Solar Production Power', 'power', 'W'),
+    "Power.House.Total": EnpalSensorConfig('mdi:home-lightning-bolt', 'Enpal Power House Total', 'power', 'W'),
+    "Power.External.Total": EnpalSensorConfig('mdi:home-lightning-bolt', 'Enpal Power External Total', 'power', 'W'),
+    "Energy.Consumption.Total.Day": EnpalSensorConfig('mdi:home-lightning-bolt', 'Enpal Energy Consumption', 'energy', 'kWh'),
+    
+    "Energy.External.Total.Out.Day": EnpalSensorConfig('mdi:transmission-tower-export', 'Enpal Energy External Out Day', 'energy', 'kWh'),
+    "Energy.External.Total.In.Day": EnpalSensorConfig('mdi:transmission-tower-import', 'Enpal Energy External In Day', 'energy', 'kWh'),
+    
+    "Energy.Production.Total.Day": EnpalSensorConfig('mdi:solar-power-variant', 'Enpal Production Day', 'energy', 'kWh'),
+    
+    "Voltage.Phase.A": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Voltage Phase A', 'voltage', 'V'),
+    "Current.Phase.A": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Ampere Phase A', 'current', 'A'),
+    "Power.AC.Phase.A": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Power Phase A', 'power', 'W'),
+    "Voltage.Phase.B": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Voltage Phase B', 'voltage', 'V'),
+    "Current.Phase.B": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Ampere Phase B', 'current', 'A'),
+    "Power.AC.Phase.B": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Power Phase B', 'power', 'W'),
+    "Voltage.Phase.C": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Voltage Phase C', 'voltage', 'V'),
+    "Current.Phase.C": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Ampere Phase C', 'current', 'A'),
+    "Power.AC.Phase.C": EnpalSensorConfig('mdi:lightning-bolt', 'Enpal Power Phase C', 'power', 'W'),
+    
+    "Power.Battery.Charge.Discharge": EnpalSensorConfig('mdi:battery-charging', 'Enpal Battery Power', 'power', 'W'),
+    "Energy.Battery.Charge.Level": EnpalSensorConfig('mdi:battery', 'Enpal Battery Percent', 'battery', '%'),
+    "Energy.Battery.Charge.Day": EnpalSensorConfig('mdi:battery-arrow-up', 'Enpal Battery Charge Day', 'energy', 'kWh'),
+    "Energy.Battery.Discharge.Day": EnpalSensorConfig('mdi:battery-arrow-down', 'Enpal Battery Discharge Day', 'energy', 'kWh'),
+    "Energy.Battery.Charge.Total.Unit.1": EnpalSensorConfig('mdi:battery-arrow-up', 'Enpal Battery Charge Total', 'energy', 'kWh'),
+    "Energy.Battery.Discharge.Total.Unit.1": EnpalSensorConfig('mdi:battery-arrow-down', 'Enpal Battery Discharge Total', 'energy', 'kWh'),
+    
+    "State.Wallbox.Connector.1.Charge": EnpalSensorConfig('mdi:ev-station', 'Wallbox Charge Percent', 'battery', '%'),
+    "Power.Wallbox.Connector.1.Charging": EnpalSensorConfig('mdi:ev-station', 'Wallbox Charging Power', 'power', 'W'),
+    "Energy.Wallbox.Connector.1.Charged.Total": EnpalSensorConfig('mdi:ev-station', 'Wallbox Charging Total', 'energy', 'Wh'),
+}
+
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='enpal')
     query_api = client.query_api()
@@ -30,7 +70,6 @@ def get_tables(ip: str, port: int, token: str):
 
     tables = query_api.query(query)
     return tables
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -56,72 +95,26 @@ async def async_setup_entry(
 
     tables = await hass.async_add_executor_job(get_tables, config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
 
-
+    encountered_fields = set()
     for table in tables:
         field = table.records[0].values['_field']
         measurement = table.records[0].values['_measurement']
-
-        if measurement == "inverter" and field == "Power.DC.Total":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'Enpal Solar Production Power', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "inverter" and field == "Power.House.Total":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Power House Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "system" and field == "Power.External.Total":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Power External Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        # Consum Total per Day
-        if measurement == "system" and field == "Energy.Consumption.Total.Day":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Energy Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-
-        # to the Grid and from the Grid
-        if measurement == "system" and field == "Energy.External.Total.Out.Day":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:transmission-tower-export', 'Enpal Energy External Out Day', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-        if measurement == "system" and field == "Energy.External.Total.In.Day":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:transmission-tower-import', 'Enpal Energy External In Day', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-
-        # Solar Energy.Production.Total.Day
-        if measurement == "system" and field == "Energy.Production.Total.Day":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power-variant', 'Enpal Production Day', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-
-        #Power Sensor
-        if measurement == "powerSensor" and field == "Voltage.Phase.A":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Voltage Phase A', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'voltage', 'V'))
-        if measurement == "powerSensor" and field == "Current.Phase.A":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Ampere Phase A', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'current', 'A'))
-        if measurement == "powerSensor" and field == "Power.AC.Phase.A":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Power Phase A', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "powerSensor" and field == "Voltage.Phase.B":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Voltage Phase B', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'voltage', 'V'))
-        if measurement == "powerSensor" and field == "Current.Phase.B":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Ampere Phase B', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'current', 'A'))
-        if measurement == "powerSensor" and field == "Power.AC.Phase.B":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Power Phase B', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "powerSensor" and field == "Voltage.Phase.C":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Voltage Phase C', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'voltage', 'V'))
-        if measurement == "powerSensor" and field == "Current.Phase.C":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Ampere Phase C', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'current', 'A'))
-        if measurement == "powerSensor" and field == "Power.AC.Phase.C":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Power Phase C', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-
-        #Battery
-        if measurement == "battery" and field == "Power.Battery.Charge.Discharge":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:battery-charging', 'Enpal Battery Power', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "battery" and field == "Energy.Battery.Charge.Level":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:battery', 'Enpal Battery Percent', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'battery', '%'))
-        if measurement == "battery" and field == "Energy.Battery.Charge.Day":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:battery-arrow-up', 'Enpal Battery Charge Day', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-        if measurement == "battery" and field == "Energy.Battery.Discharge.Day":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:battery-arrow-down', 'Enpal Battery Discharge Day', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-        if measurement == "battery" and field == "Energy.Battery.Charge.Total.Unit.1":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:battery-arrow-up', 'Enpal Battery Charge Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-        if measurement == "battery" and field == "Energy.Battery.Discharge.Total.Unit.1":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:battery-arrow-down', 'Enpal Battery Discharge Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-
-        #Wallbox
-        if measurement == "wallbox" and field == "State.Wallbox.Connector.1.Charge":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:ev-station', 'Wallbox Charge Percent', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'battery', '%'))
-        if measurement == "wallbox" and field == "Power.Wallbox.Connector.1.Charging":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:ev-station', 'Wallbox Charging Power', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "wallbox" and field == "Energy.Wallbox.Connector.1.Charged.Total":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:ev-station', 'Wallbox Charging Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'Wh'))
+        
+        if field in encountered_fields:
+            # There may be duplicates because of different _measurement values
+            # e.g. "inverter" and "powerSensor" share some fields
+            # we also can't choose which measurement's field to use, 
+            # since different Enpal devices have different measurements for the same fields
+            # Why? idk, ask Enpal
+            continue
+        encountered_fields.add(field)
+        try:
+            field_config = FIELD_MAP[field]
+        except KeyError:
+            _LOGGER.debug("Encountered field %s without config. This is normal. Skipping", field)
+            continue
+        to_add.append(EnpalSensor(field, measurement, field_config.icon, field_config.name, config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], field_config.device_class, field_config.unit))
+        encountered_fields.add(field)
 
     entity_registry = async_get(hass)
     entries = async_entries_for_config_entry(
